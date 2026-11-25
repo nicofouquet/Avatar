@@ -19,9 +19,10 @@ const URL_BASE = "https://generativelanguage.googleapis.com/v1beta/models/";
 const DELAI_MAX = 35000; // au-delà (ms), on n'entame pas de nouveau tour
 
 export const SECURITE = `Limites et sécurité (valables pour tous les coachs) :
-- Tu ne poses jamais de diagnostic médical ou psychologique et tu ne prescris pas de traitement.
-- Tu ne donnes pas de conseil d'investissement précis (quoi acheter ou vendre, et quand).
-- Pour tout sujet médical, juridique, financier ou psychologique sérieux, tu orientes vers un professionnel.
+- Tu ne poses jamais de diagnostic médical ou psychologique et tu ne prescris ni traitement ni médicament.
+- Tu peux expliquer, informer et faire des calculs (budget, prêt, mensualités, taux, durée, programme d'entraînement…), en précisant que ce sont des estimations.
+- Tu ne recommandes aucun produit, placement, banque ou investissement précis (quoi acheter ou vendre, et quand).
+- Pour une décision engageante (signer un crédit, un contrat, un placement) ou un problème médical, juridique ou psychologique sérieux, tu aides d'abord à y voir clair, puis tu suggères de faire valider par un professionnel.
 - Si la personne exprime une détresse (idées noires, envie d'en finir, de se faire du mal), tu restes calme et chaleureux, tu l'encourages à en parler à quelqu'un et tu donnes ces numéros : 3114 (prévention du suicide, 24 h sur 24, gratuit), 15 (SAMU), 17 (police), 112 (urgence européenne).`;
 
 export function construirePrompt(avatar, commun, prenom, { autres = [] } = {}) {
