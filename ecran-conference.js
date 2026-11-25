@@ -118,7 +118,7 @@ export function initConference(ctx) {
       const emotion = derniere && ETATS[derniere.emotion] ? derniere.emotion : null;
       const pastille = document.createElement("div");
       pastille.className = "pastille";
-      ctx.pastille(pastille, a, emotion);
+      ctx.pastille(pastille, a, emotion, true);
       const texte = document.createElement("div");
       texte.className = "texte";
       const nom = document.createElement("div");

@@ -24,7 +24,7 @@ export function initAppel(ctx) {
     const conv = ctx.etat.conversations[actuel.id] || [];
     const derniere = [...conv].reverse().find((m) => m.role === "avatar" && m.emotion);
     const emotion = derniere && ETATS[derniere.emotion] ? derniere.emotion : "neutre";
-    ctx.pastille($("pastille"), actuel, emotion);
+    ctx.pastille($("pastille"), actuel, emotion, true);
     $("titre").querySelector(".nom").textContent = actuel.nom;
     $("titre").querySelector(".etat").textContent = ETATS[emotion];
     const lignes = String(actuel.memoire?.texte || "").split("\n").map((l) => l.trim()).filter(Boolean).slice(-2);

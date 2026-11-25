@@ -30,13 +30,20 @@ function montrer(nom) {
 }
 
 // Photo ronde si le coach en a une (data-URL image ou chemin portraits/…), sinon pastille de couleur avec initiales.
-function pastille(el, a, emotion) {
+// agrandissable : un appui sur la photo l'affiche en grand (visionneuse).
+function pastille(el, a, emotion, agrandissable = false) {
   el.style.background = a.couleur;
   el.replaceChildren();
+  el.onclick = null;
+  el.style.cursor = "";
   if (photoValide(a.photo)) {
     const img = document.createElement("img");
     img.alt = ""; img.src = a.photo;
     el.appendChild(img);
+    if (agrandissable) {
+      el.style.cursor = "zoom-in";
+      el.onclick = (e) => { e.stopPropagation(); ouvrirVisionneuse(a.photo, a.nom); };
+    }
   } else el.textContent = initiales(a.nom);
   if (emotion) {
     const s = document.createElement("span");
@@ -44,6 +51,31 @@ function pastille(el, a, emotion) {
     el.appendChild(s);
   }
 }
+
+// Visionneuse : photo plein écran. Elle prend une entrée d'historique pour que le bouton retour d'Android la ferme sans quitter l'écran.
+let visionneuseOuverte = false, fermetureEnCours = false;
+function ouvrirVisionneuse(photo, nom) {
+  if (visionneuseOuverte || !photoValide(photo)) return;
+  visionneuseOuverte = true;
+  fermetureEnCours = false;
+  $("visio-img").src = photo;
+  $("visio-img").alt = nom ? `Photo de ${nom}` : "";
+  $("visionneuse").hidden = false;
+  history.pushState({ ecran: ecranCourant, visionneuse: true }, "");
+}
+function masquerVisionneuse() {
+  visionneuseOuverte = false;
+  fermetureEnCours = false;
+  $("visionneuse").hidden = true;
+  $("visio-img").removeAttribute("src");
+}
+// popstate la masque ; un double appui ne doit reculer qu'une fois (sinon on quitterait l'écran).
+function fermerVisionneuse() {
+  if (!visionneuseOuverte || fermetureEnCours) return;
+  fermetureEnCours = true;
+  history.back();
+}
+$("visionneuse").onclick = fermerVisionneuse;
 
 let delaiAlerte = 0;
 function alerte(texte) {
@@ -78,6 +110,7 @@ function retour(sans = false, n = 1) {
   history.go(-n);
 }
 window.addEventListener("popstate", (e) => {
+  if (visionneuseOuverte) { masquerVisionneuse(); return; } // retour = fermer la photo, on reste sur l'écran
   if (!etat) return;
   const cible = e.state?.ecran || "liste";
   const sans = sansConfirmer;
@@ -96,7 +129,7 @@ function ouvrirChat(a) {
 }
 
 const ctx = {
-  $, pastille, sauver, aller, retour, alerte,
+  $, pastille, ouvrirVisionneuse, sauver, aller, retour, alerte,
   get etat() { return etat; },
   get actuelId() { return actuelId; },
   ecran: () => ecranCourant,

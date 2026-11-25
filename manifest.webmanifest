@@ -1,6 +1,6 @@
 {
-  "name": "Avatar",
-  "short_name": "Avatar",
+  "name": "Avatar Coach",
+  "short_name": "Avatar Coach",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

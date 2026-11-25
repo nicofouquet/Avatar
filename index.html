@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Newsreader:wght@500;600&display=swap">
-<title>Avatar</title>
+<title>Avatar Coach</title>
 <style>
   /* Thème « ciel et soleil » : clair par défaut, sombre selon le téléphone. */
   :root {
@@ -109,6 +109,10 @@
   .conf-carte.erreur .etat { color: var(--av-texte); }
   .bulle .qui { display: block; font-size: 12px; font-weight: 700; color: var(--texte2); margin-bottom: 2px; }
   #conf-fil .bulle { max-width: 88%; }
+  #visionneuse { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.92); display: grid; place-items: center; cursor: zoom-out; }
+  #visionneuse[hidden] { display: none; }
+  #visio-img { width: min(96vw, 90vh); aspect-ratio: 1; object-fit: contain; border-radius: 8px; }
+  #visio-fermer { position: absolute; top: calc(8px + env(safe-area-inset-top)); right: 8px; width: 48px; height: 48px; border: 0; border-radius: 50%; background: rgba(255,255,255,.18); color: #fff; font-size: 32px; line-height: 1; cursor: pointer; }
   #alerte { position: fixed; left: 50%; bottom: calc(150px + env(safe-area-inset-bottom)); pointer-events: none; transform: translateX(-50%); max-width: 480px; width: calc(100% - 32px); z-index: 5; }
 </style>
 </head>
@@ -178,7 +182,8 @@
     </div>
     <div class="msg" id="f-msg" role="status"></div>
     <div class="portrait-panel" id="f-portrait" hidden>
-      <label>Description du portrait<textarea id="f-portrait-desc" rows="3"></textarea></label>
+      <label>Description du portrait<textarea id="f-portrait-desc" rows="3" maxlength="450"></textarea></label>
+      <div class="msg" id="f-portrait-compte" aria-live="off">0 / 450</div>
       <img class="apercu" id="f-portrait-img" alt="Aperçu du portrait" hidden>
       <div class="msg" id="f-portrait-msg" role="status"></div>
       <div class="rang">
@@ -230,6 +235,11 @@
     <button class="bouton" id="reglages-ok" type="button">Enregistrer</button>
   </div>
 </section>
+
+<div id="visionneuse" hidden>
+  <img id="visio-img" alt="">
+  <button id="visio-fermer" type="button" aria-label="Fermer">×</button>
+</div>
 
 <div id="alerte" class="avert" role="alert" hidden></div>
 

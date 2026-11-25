@@ -13,7 +13,7 @@ export function initFiche(ctx) {
   const lignes = (texte) => String(texte || "").split("\n").map((l) => l.trim()).filter(Boolean);
 
   function dessinerPhoto() {
-    ctx.pastille($("f-photo"), { ...coach, photo });
+    ctx.pastille($("f-photo"), { ...coach, photo }, null, true);
     $("f-choisir").textContent = photo ? "Changer" : "Choisir une photo";
   }
 
@@ -96,15 +96,18 @@ export function initFiche(ctx) {
 
   const descriptionDepart = () => {
     const v = coach.voix.description.trim();
-    return `Portrait de ${coach.nom}, ${coach.lien || "coach de vie"}${v ? ` (${v})` : ""}.`;
+    return `Portrait de ${coach.nom}, ${coach.lien || "coach de vie"}${v ? ` (${v})` : ""}.`.slice(0, 450); // même limite que la saisie
   };
 
   $("f-creer").onclick = () => {
     if (!courant()) return;
-    if ($("f-portrait").hidden) { $("f-portrait-desc").value = descriptionDepart(); essai = null; messagePortrait(""); etatPortrait(false); }
+    if ($("f-portrait").hidden) { $("f-portrait-desc").value = descriptionDepart(); compteur(); essai = null; messagePortrait(""); etatPortrait(false); }
     $("f-portrait").hidden = false;
   };
   $("f-portrait-fermer").onclick = fermerPortrait;
+
+  const compteur = () => { $("f-portrait-compte").textContent = `${$("f-portrait-desc").value.length} / 450`; };
+  $("f-portrait-desc").oninput = compteur;
 
   $("f-portrait-gen").onclick = async () => {
     if (!courant() || $("f-portrait-gen").disabled) return;
