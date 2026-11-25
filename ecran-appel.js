@@ -1,6 +1,7 @@
 // Écran « Appel » (version texte) : fil de conversation, état du coach, mémoire, fin de séance et résumés.
 import { construirePrompt, repondre, resumerMemoire } from "./cerveau.js";
 import { ajouterSouvenirs, messagesAResumer, noterSeance, terminerSeance, entreesConservees } from "./donnees.js";
+import { micro } from "./voix.js";
 
 const ERREURS = {
   cle_absente: "Ajoute ta clé Gemini dans Réglages.",
@@ -16,6 +17,11 @@ const ETATS = {
 const MEMOIRE_PLEINE = "Mémoire du téléphone pleine : efface des conversations.";
 const DELAI_RESUME = 40000; // ms
 const MAX_MESSAGES = 40; // seuls les derniers messages partent à Gemini ; le fil complet reste stocké
+const MICRO = {
+  refuse: "Micro indisponible, écris ton message",
+  rien: "Je n'ai rien entendu, réessaie.",
+  erreur: "La dictée n'a pas marché : réessaie ou écris ton message.",
+};
 
 export function initAppel(ctx) {
   const { $ } = ctx;
@@ -61,10 +67,64 @@ export function initAppel(ctx) {
   function dessinerSaisie() {
     $("envoyer").disabled = enCours;
     const ailleurs = enCours && attente.id !== ctx.actuelId;
-    $("message").placeholder = ailleurs ? `Attends la réponse de ${prenomDe(attente.nom)}…` : "Écris un message…";
+    $("message").placeholder = enEcoute ? "Je t'écoute…" : ailleurs ? `Attends la réponse de ${prenomDe(attente.nom)}…` : "Écris un message…";
   }
 
-  function afficher() { entete(); dessinerFil(); dessinerSaisie(); }
+  // ---------- Dictée au micro ----------
+  // Chaque dictée a un numéro : une dictée périmée (message envoyé, autre coach, appli en arrière-plan) est ignorée.
+  const dictee = micro();
+  let ecoute = 0, enEcoute = false;
+
+  function dessinerMicro() {
+    $("micro").setAttribute("aria-pressed", String(enEcoute));
+    $("micro").setAttribute("aria-label", enEcoute ? "Arrêter la dictée" : "Dicter un message");
+    dessinerSaisie();
+  }
+
+  function couperMicro() {
+    if (!enEcoute) return;
+    ecoute++;
+    enEcoute = false;
+    dictee.arreter();
+    dessinerMicro();
+  }
+
+  $("micro").onclick = async () => {
+    if (enEcoute) {
+      // 2e appui : on garde ce qui a été dit ; si Chrome ne termine jamais, on libère le bouton au bout de 3 s.
+      const n = ecoute;
+      dictee.arreter();
+      setTimeout(() => { if (n === ecoute) couperMicro(); }, 3000);
+      return;
+    }
+    if (!dictee.disponible) { ctx.alerte(MICRO.refuse); return; }
+    const mon = ++ecoute, id = ctx.actuelId;
+    const avant = $("message").value.trim(); // le texte déjà tapé est gardé devant la dictée
+    const joindre = (t) => [avant, t].filter(Boolean).join(" ");
+    let ecrit = $("message").value; // dernier texte posé par la dictée : si Nico a tapé depuis, on ne l'écrase pas
+    const ecrire = (t) => { if ($("message").value === ecrit) { ecrit = t; $("message").value = t; } };
+    // Écran quitté (bouton retour d'Android compris) ou autre coach : la dictée est arrêtée et ignorée.
+    const valide = () => {
+      if (mon !== ecoute) return false;
+      if (ctx.actuelId === id && ctx.ecran() === "chat") return true;
+      couperMicro();
+      return false;
+    };
+    enEcoute = true;
+    dessinerMicro();
+    try {
+      const texte = await dictee.ecouter({ surPartiel: (t) => { if (valide()) ecrire(joindre(t)); } });
+      if (valide()) ecrire(joindre(texte));
+    } catch (e) {
+      if (valide()) { ecrire(avant); if (e !== "annule") ctx.alerte(MICRO[e] || MICRO.erreur); }
+    } finally {
+      if (mon === ecoute) { enEcoute = false; dessinerMicro(); }
+    }
+  };
+
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") couperMicro(); });
+
+  function afficher() { couperMicro(); entete(); dessinerFil(); dessinerSaisie(); }
   const redessiner = () => { if (ctx.actuelId) { dessinerFil(); dessinerSaisie(); } };
 
   // ---------- Résumés de séance ----------
@@ -108,6 +168,7 @@ export function initAppel(ctx) {
 
   $("terminer").onclick = () => {
     const id = ctx.actuelId;
+    couperMicro();
     ctx.retour();
     if (id) resumer(id); // en arrière-plan : l'interface n'attend pas Gemini
   };
@@ -121,6 +182,7 @@ export function initAppel(ctx) {
     if (!texte || enCours) return;
     const a = ctx.coachCourant(), mon = epoque;
     if (!a) return;
+    couperMicro(); // la dictée en cours ne doit pas réécrire la saisie après l'envoi
     const messages = [...(etat.conversations[a.id] || []), { role: "user", texte }].map(({ role, texte }) => ({ role, texte })).slice(-MAX_MESSAGES);
     while (messages[0].role !== "user") messages.shift(); // l'échange commence toujours par Nico
     enCours = true;
