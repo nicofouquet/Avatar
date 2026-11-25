@@ -166,6 +166,10 @@ function normaliserCoach(a) {
   };
 }
 
+// Résumé de conférence en attente : { conf, coach, depuis } (depuis = nombre de messages déjà résumés).
+const entreeConfValide = (x) => x && typeof x === "object" && typeof x.conf === "string" && typeof x.coach === "string"
+  && Number.isInteger(x.depuis) && x.depuis >= 0;
+
 // Complète un état (ancien format ou partiel) : champs manquants, coachs de départ absents. Ne retire rien.
 export function normaliser(etat) {
   const e = copie(etat || {});
@@ -182,6 +186,7 @@ export function normaliser(etat) {
     conversations: e.conversations && typeof e.conversations === "object" && !Array.isArray(e.conversations) ? e.conversations : {},
     conferences: Array.isArray(e.conferences) ? e.conferences : [],
     aResumer: Array.isArray(e.aResumer) ? e.aResumer : [],
+    aResumerConf: Array.isArray(e.aResumerConf) ? e.aResumerConf.filter(entreeConfValide) : [],
   };
 }
 
@@ -219,6 +224,7 @@ export function supprimerCoach(etat, id) {
   if (COACHS_DEPART.some((c) => c.id === id)) e.supprimes = [...new Set([...listeIds(e.supprimes), id])];
   if (e.conversations) delete e.conversations[id];
   if (Array.isArray(e.aResumer)) e.aResumer = e.aResumer.filter((x) => x !== id && !(x && x.id === id));
+  if (Array.isArray(e.aResumerConf)) e.aResumerConf = e.aResumerConf.filter((x) => !(x && x.coach === id));
   return e;
 }
 
@@ -346,4 +352,47 @@ export function conversationsPerdues(avant, apres) {
   const av = avant && typeof avant === "object" ? avant : {};
   const ap = apres && typeof apres === "object" ? apres : {};
   return Object.entries(av).some(([id, v]) => Array.isArray(v) && v.length && JSON.stringify(v) !== JSON.stringify(ap[id] || []));
+}
+
+// ---------- Conférences à résumer ----------
+
+// Messages de Nico d'une conférence à résumer : à partir de `depuis`, au plus les 40 derniers, au format { role: "user", texte }.
+export function messagesNicoConf(conference, depuis, max = 40) {
+  const msgs = Array.isArray(conference?.messages) ? conference.messages : [];
+  const debut = Number.isInteger(depuis) && depuis > 0 ? depuis : 0;
+  return msgs.slice(debut).filter((m) => m && m.role === "user" && typeof m.texte === "string").slice(-max).map(({ texte }) => ({ role: "user", texte }));
+}
+
+// Ajoute une entrée { conf, coach, depuis } par participant (s'il reste des messages de Nico à résumer et
+// qu'aucune entrée n'existe déjà pour lui) ; ne modifie pas la liste reçue.
+export function noterResumesConf(aResumerConf, conference) {
+  const liste = Array.isArray(aResumerConf) ? aResumerConf.filter(entreeConfValide) : [];
+  const depuis = Number.isInteger(conference.resume) && conference.resume > 0 ? conference.resume : 0;
+  if (!messagesNicoConf(conference, depuis).length) return liste;
+  const nouvelles = (conference.participants || [])
+    .filter((coach) => !liste.some((x) => x.conf === conference.id && x.coach === coach))
+    .map((coach) => ({ conf: conference.id, coach, depuis }));
+  return [...liste, ...nouvelles];
+}
+
+const memeEntreeConf = (a, b) => a.conf === b.conf && a.coach === b.coach && a.depuis === b.depuis;
+
+// Fin d'un résumé de conférence qui a vu `vu` messages : l'entrée est retirée, sauf si des messages sont arrivés
+// depuis (elle avance alors à { depuis: vu } pour que la suite soit résumée à son tour). Retrouve l'entrée par conf/coach/depuis.
+export function terminerResumeConf(aResumerConf, entree, vu, longueurActuelle) {
+  const liste = Array.isArray(aResumerConf) ? aResumerConf : [];
+  if (!(longueurActuelle > vu)) return liste.filter((x) => !memeEntreeConf(x, entree));
+  return liste.map((x) => (memeEntreeConf(x, entree) ? { ...x, depuis: vu } : x));
+}
+
+// Après un import : on garde les entrées dont le coach et la conférence existent encore, et dont les messages
+// déjà vus (jusqu'à `depuis`) sont identiques avant et après.
+export function entreesConfConservees(aResumerConf, avant, apres, avatars) {
+  const trouver = (liste, id) => (Array.isArray(liste) ? liste : []).find((c) => c && c.id === id);
+  return (Array.isArray(aResumerConf) ? aResumerConf : []).filter((x) => {
+    const a = trouver(avant, x.conf), b = trouver(apres, x.conf);
+    if (!a || !b || !avatars.some((c) => c.id === x.coach)) return false;
+    const ma = Array.isArray(a.messages) ? a.messages : [], mb = Array.isArray(b.messages) ? b.messages : [];
+    return x.depuis <= mb.length && JSON.stringify(ma.slice(0, x.depuis)) === JSON.stringify(mb.slice(0, x.depuis));
+  });
 }

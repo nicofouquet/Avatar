@@ -4,6 +4,7 @@ import { normaliser } from "./donnees.js";
 import { ouvrir as ouvrirBase, lireEtat, ecrireEtat } from "./stockage.js";
 import { initEquipe } from "./ecran-equipe.js";
 import { initAppel } from "./ecran-appel.js";
+import { initConference } from "./ecran-conference.js";
 import { initFiche } from "./ecran-fiche.js";
 import { initReglages } from "./ecran-reglages.js";
 
@@ -67,6 +68,7 @@ function aller(ecran) {
 }
 function afficher(ecran) {
   if (ecran === "chat" && coachCourant()) { appel.afficher(); montrer("chat"); }
+  else if (ecran === "conference" && conference.ouverte()) { conference.afficher(); montrer("conference"); }
   else if (ecran === "fiche" && fiche.ouverte()) montrer("fiche");
   else if (ecran === "reglages") montrer("reglages");
   else { equipe.dessiner(); montrer("liste"); }
@@ -103,14 +105,16 @@ const ctx = {
   rafraichirFiche: (id) => fiche?.rafraichir(id),
   ouvrirChat,
   ouvrirFiche: (a, origine) => fiche.ouvrir(a, origine),
+  ouvrirConference: (ids) => conference.ouvrir(ids),
+  rouvrirConference: (c) => conference.rouvrir(c),
   apresSuppression(id) {
     appel.apresSuppression(id);
     if (actuelId === id) actuelId = null;
   },
-  apresImport(avant) { appel.apresImport(avant); if (!coachCourant()) actuelId = null; },
-  apresEffacement() { appel.apresEffacement(); },
+  apresImport(avant, avantConf) { appel.apresImport(avant); conference.apresImport(avantConf); if (!coachCourant()) actuelId = null; },
+  apresEffacement() { appel.apresEffacement(); conference.apresEffacement(); },
 };
-let equipe, appel, fiche, reglages;
+let equipe, appel, conference, fiche, reglages;
 
 $("retour").onclick = () => retour();
 $("vers-fiche").onclick = () => { const c = coachCourant(); if (c) fiche.ouvrir(c, "chat"); };
@@ -128,10 +132,12 @@ $("bandeau").onclick = () => reglages.ouvrir();
   }
   equipe = initEquipe(ctx);
   appel = initAppel(ctx);
+  conference = initConference(ctx);
   fiche = initFiche(ctx);
   reglages = initReglages(ctx);
   history.replaceState({ ecran: "liste" }, "");
   afficher("liste");
   window.avatarPret = true; // lu par le minuteur d'index.html
   appel.resumerTout(); // séances restées sans résumé : en arrière-plan, sans bloquer l'écran
+  conference.resumerTout(); // idem pour les conférences terminées sans résumé
 })();

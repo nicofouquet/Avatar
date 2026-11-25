@@ -73,18 +73,19 @@ export function initReglages(ctx) {
       if (!confirm(texte)) return;
     }
     const avant = etat.conversations; // l'ancien objet reste intact : importer a travaillé sur une copie
+    const avantConf = etat.conferences;
     Object.assign(etat, res.etat);
-    ctx.apresImport(avant);
+    ctx.apresImport(avant, avantConf);
     $("r-commun").value = etat.commun;
     $("r-msg").textContent = "Coachs importés.";
     await ctx.sauver();
   };
 
   $("effacer").onclick = async () => {
-    if (!confirm("Effacer toutes les conversations ? Les fiches sont gardées.")) return;
+    if (!confirm("Effacer toutes les conversations et conférences ? Les fiches sont gardées.")) return;
     ctx.etat.conversations = {};
     ctx.apresEffacement();
-    $("r-msg").textContent = "Conversations effacées.";
+    $("r-msg").textContent = "Conversations et conférences effacées.";
     await ctx.sauver();
   };
 
