@@ -1,7 +1,8 @@
-// Écran « Fiche » d'un coach : photo, nom, rôle, fiche, voix, mémoire (oublier / annuler), suppression.
+// Écran « Fiche » d'un coach : photo (choisie ou portrait généré), nom, rôle, fiche, voix, mémoire (oublier / annuler), suppression.
 import { supprimerCoach, oublierSouvenir, annulerMemoire } from "./donnees.js";
 import { preparerPhoto } from "./photo.js";
 import { VOIX } from "./voix.js";
+import { genererPortrait, URL_PORTRAITS, MESSAGES_ERREUR } from "./portrait.js";
 
 export function initFiche(ctx) {
   const { $ } = ctx;
@@ -57,6 +58,7 @@ export function initFiche(ctx) {
     $("f-voix").value = c.voix.nom;
     $("f-voix-desc").value = c.voix.description;
     $("f-msg").textContent = "";
+    fermerPortrait(); // ferme le panneau et invalide tout portrait encore en cours pour le coach précédent
     dessinerPhoto();
     dessinerMemoire();
     ctx.aller("fiche");
@@ -75,6 +77,63 @@ export function initFiche(ctx) {
     catch { $("f-msg").textContent = "Image illisible : choisis une autre photo."; }
   };
 
+
+  // ---------- Portrait généré (service Cloudflare) ----------
+  // jeton : change à chaque ouverture de fiche et à chaque « Recommencer » ; un résultat tardif d'un autre coach (ou d'un essai abandonné) est ignoré.
+  let jeton = 0, essai = null; // essai : image prête (data-URL 512 px) en attente de « Garder »
+
+  function messagePortrait(texte) { $("f-portrait-msg").textContent = texte; }
+  function etatPortrait(enCours) {
+    $("f-portrait-gen").disabled = enCours;
+    $("f-portrait-gen").textContent = enCours ? "Création du portrait…" : "Générer";
+    $("f-portrait-gen").hidden = !!essai;
+    $("f-portrait-garder").hidden = !essai;
+    $("f-portrait-refaire").hidden = !essai;
+    $("f-portrait-img").hidden = !essai;
+    if (essai) $("f-portrait-img").src = essai;
+  }
+  function fermerPortrait() { jeton++; essai = null; $("f-portrait").hidden = true; messagePortrait(""); etatPortrait(false); }
+
+  const descriptionDepart = () => {
+    const v = coach.voix.description.trim();
+    return `Portrait de ${coach.nom}, ${coach.lien || "coach de vie"}${v ? ` (${v})` : ""}.`;
+  };
+
+  $("f-creer").onclick = () => {
+    if (!courant()) return;
+    if ($("f-portrait").hidden) { $("f-portrait-desc").value = descriptionDepart(); essai = null; messagePortrait(""); etatPortrait(false); }
+    $("f-portrait").hidden = false;
+  };
+  $("f-portrait-fermer").onclick = fermerPortrait;
+
+  $("f-portrait-gen").onclick = async () => {
+    if (!courant() || $("f-portrait-gen").disabled) return;
+    const moi = ++jeton, id = coach.id;
+    const r = ctx.etat.reglages;
+    messagePortrait("");
+    etatPortrait(true);
+    const res = await genererPortrait({
+      url: r.portraitUrl || URL_PORTRAITS, motDePasse: r.portraitMotDePasse || "",
+      description: $("f-portrait-desc").value, cle: r.cle,
+    });
+    if (moi !== jeton || !courant() || coach.id !== id) return; // fiche quittée ou autre coach ouvert entre-temps
+    let image = res.image, erreur = res.erreur;
+    if (image) {
+      try { image = await preparerPhoto(image); } catch { image = null; erreur = "service"; }
+      if (moi !== jeton || !courant() || coach.id !== id) return;
+    }
+    essai = image;
+    messagePortrait(image ? "" : MESSAGES_ERREUR[erreur] || MESSAGES_ERREUR.service);
+    etatPortrait(false);
+  };
+  $("f-portrait-refaire").onclick = () => { jeton++; essai = null; messagePortrait(""); etatPortrait(false); };
+  $("f-portrait-garder").onclick = () => {
+    if (!courant() || !essai) return;
+    photo = essai; // comme une photo choisie : enregistrée avec la fiche (Enregistrer)
+    dessinerPhoto();
+    fermerPortrait();
+    $("f-msg").textContent = "Portrait gardé : touche Enregistrer pour le conserver.";
+  };
   $("f-annuler-mem").onclick = async () => { if (!courant()) return; coach.memoire = annulerMemoire(coach.memoire); dessinerMemoire(); await ctx.sauver(); };
 
   $("fiche-annuler").onclick = () => ctx.retour(false);

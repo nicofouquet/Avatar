@@ -1,5 +1,6 @@
-// Écran « Réglages » : clé, prénom, texte commun, rappels de confidentialité et d'export, export / import.
+// Écran « Réglages » : clé, service portraits (adresse, mot de passe), prénom, texte commun, rappels de confidentialité et d'export, export / import.
 import { exporter, importer, conversationsPerdues } from "./donnees.js";
+import { URL_PORTRAITS } from "./portrait.js";
 
 const TRENTE_JOURS = 30 * 24 * 3600 * 1000;
 
@@ -17,6 +18,8 @@ export function initReglages(ctx) {
     const etat = ctx.etat;
     $("r-cle").value = etat.reglages.cle;
     $("r-prenom").value = etat.reglages.prenom;
+    $("r-portrait-url").value = etat.reglages.portraitUrl || URL_PORTRAITS;
+    $("r-portrait-mdp").value = etat.reglages.portraitMotDePasse || "";
     $("r-commun").value = etat.commun;
     $("r-payante").checked = !!etat.reglages.clePayante;
     $("r-msg").textContent = "";
@@ -30,6 +33,8 @@ export function initReglages(ctx) {
     const etat = ctx.etat;
     etat.reglages.cle = $("r-cle").value.trim();
     etat.reglages.prenom = $("r-prenom").value.trim() || "Nico";
+    etat.reglages.portraitUrl = $("r-portrait-url").value.trim() || URL_PORTRAITS;
+    etat.reglages.portraitMotDePasse = $("r-portrait-mdp").value.trim();
     etat.reglages.clePayante = $("r-payante").checked;
     etat.commun = $("r-commun").value;
     ctx.retour(false);

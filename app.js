@@ -1,6 +1,6 @@
 // Navigation et état partagé. Les écrans vivent dans ecran-*.js ;
 // la logique métier dans cerveau.js et donnees.js ; le stockage dans stockage.js.
-import { normaliser } from "./donnees.js";
+import { normaliser, photoValide } from "./donnees.js";
 import { ouvrir as ouvrirBase, lireEtat, ecrireEtat } from "./stockage.js";
 import { initEquipe } from "./ecran-equipe.js";
 import { initAppel } from "./ecran-appel.js";
@@ -29,11 +29,11 @@ function montrer(nom) {
   document.querySelectorAll(".ecran").forEach((e) => e.classList.toggle("actif", e.id === `ecran-${nom}`));
 }
 
-// Photo ronde si le coach en a une (data-URL image seulement), sinon pastille de couleur avec initiales.
+// Photo ronde si le coach en a une (data-URL image ou chemin portraits/…), sinon pastille de couleur avec initiales.
 function pastille(el, a, emotion) {
   el.style.background = a.couleur;
   el.replaceChildren();
-  if (typeof a.photo === "string" && a.photo.startsWith("data:image/")) {
+  if (photoValide(a.photo)) {
     const img = document.createElement("img");
     img.alt = ""; img.src = a.photo;
     el.appendChild(img);

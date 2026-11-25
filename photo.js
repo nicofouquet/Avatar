@@ -1,18 +1,20 @@
 // Prépare une photo de coach : carré recadré au centre, 512 px, JPEG qualité 0.8 (data-URL).
+// Accepte un fichier ou Blob choisi sur le téléphone, ou une data-URL (image renvoyée par le service portraits).
 const TAILLE = 512;
 
-function charger(fichier) {
+function charger(source) {
   return new Promise((ok, ko) => {
-    const url = URL.createObjectURL(fichier);
+    const objet = typeof source === "string" ? null : URL.createObjectURL(source);
+    const libere = () => { if (objet) URL.revokeObjectURL(objet); };
     const img = new Image();
-    img.onload = () => { URL.revokeObjectURL(url); ok(img); };
-    img.onerror = () => { URL.revokeObjectURL(url); ko(new Error("Image illisible")); };
-    img.src = url;
+    img.onload = () => { libere(); ok(img); };
+    img.onerror = () => { libere(); ko(new Error("Image illisible")); };
+    img.src = objet || source;
   });
 }
 
-export async function preparerPhoto(fichier) {
-  const img = await charger(fichier);
+export async function preparerPhoto(source) {
+  const img = await charger(source);
   const l = img.naturalWidth, h = img.naturalHeight;
   if (!l || !h) throw new Error("Image illisible");
   const cote = Math.min(l, h);

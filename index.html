@@ -82,6 +82,9 @@
   .bouton.second { background: var(--carte); color: var(--accent); border: 1px solid var(--bord); }
   .bouton.danger { color: var(--danger); }
   .rang { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .portrait-panel { display: grid; gap: 10px; padding: 12px; background: var(--carte); border: 1px solid var(--bord); border-radius: 12px; }
+  .portrait-panel[hidden] { display: none; }
+  .portrait-panel .apercu { width: 160px; height: 160px; border-radius: 50%; object-fit: cover; justify-self: center; border: 1px solid var(--bord); }
   .pied { display: flex; gap: 8px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--bord); background: var(--carte); }
   .pied .bouton { flex: 1; }
   #f-fiche { min-height: 30dvh; }
@@ -170,9 +173,21 @@
     <div class="rang">
       <div id="f-photo" class="pastille grande"></div>
       <button class="bouton second" id="f-choisir" type="button">Choisir une photo</button>
+      <button class="bouton second" id="f-creer" type="button">Créer un portrait</button>
       <input id="f-fichier" type="file" accept="image/*" hidden>
     </div>
     <div class="msg" id="f-msg" role="status"></div>
+    <div class="portrait-panel" id="f-portrait" hidden>
+      <label>Description du portrait<textarea id="f-portrait-desc" rows="3"></textarea></label>
+      <img class="apercu" id="f-portrait-img" alt="Aperçu du portrait" hidden>
+      <div class="msg" id="f-portrait-msg" role="status"></div>
+      <div class="rang">
+        <button class="bouton" id="f-portrait-gen" type="button">Générer</button>
+        <button class="bouton" id="f-portrait-garder" type="button" hidden>Garder</button>
+        <button class="bouton second" id="f-portrait-refaire" type="button" hidden>Recommencer</button>
+        <button class="bouton second" id="f-portrait-fermer" type="button">Fermer</button>
+      </div>
+    </div>
     <label>Nom<input id="f-nom"></label>
     <label>Rôle<input id="f-lien"></label>
     <label>Fiche (texte libre)<textarea id="f-fiche"></textarea></label>
@@ -195,6 +210,9 @@
     <div class="avert" id="r-gratuite">Clé gratuite : Google peut lire tes échanges.</div>
     <label class="case"><input type="checkbox" id="r-payante"> J'utilise une clé payante</label>
     <label>Clé Gemini<input id="r-cle" type="password" autocomplete="off"></label>
+    <h2>Service portraits</h2>
+    <label>Adresse du service<input id="r-portrait-url" type="url" autocomplete="off" inputmode="url"></label>
+    <label>Mot de passe du service<input id="r-portrait-mdp" type="password" autocomplete="off"></label>
     <label>Ton prénom<input id="r-prenom"></label>
     <label>Ce que tous savent<textarea id="r-commun" rows="8"></textarea></label>
     <h2>Coachs</h2>
