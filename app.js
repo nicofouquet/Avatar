@@ -1,36 +1,42 @@
-// Écrans et événements de l'appli. La logique métier vit dans cerveau.js et donnees.js.
-import { construirePrompt, repondre } from "./cerveau.js";
-import { charger, sauver, exporter, importer } from "./donnees.js";
+// Navigation et état partagé. Les écrans vivent dans ecran-*.js ;
+// la logique métier dans cerveau.js et donnees.js ; le stockage dans stockage.js.
+import { normaliser } from "./donnees.js";
+import { ouvrir as ouvrirBase, lireEtat, ecrireEtat } from "./stockage.js";
+import { initEquipe } from "./ecran-equipe.js";
+import { initAppel } from "./ecran-appel.js";
+import { initFiche } from "./ecran-fiche.js";
+import { initReglages } from "./ecran-reglages.js";
 
 const EMOJI = { neutre: "🙂", joie: "😄", rire: "😂", surprise: "😮", tristesse: "😢", reflexion: "🤔", agacement: "😤" };
-const ERREURS = {
-  cle_absente: "Ajoute ta clé Gemini dans Réglages.",
-  cle_refusee: "Clé refusée par Google : vérifie-la dans Réglages.",
-  hors_ligne: "Pas de connexion. Réessaie quand tu as du réseau.",
-  sature: "Google est saturé, réessaie dans un instant.",
-  quota: "Quota gratuit de Google atteint pour aujourd'hui, réessaie demain.",
-};
-const MEMOIRE_PLEINE = "Mémoire du téléphone pleine : efface les conversations.";
-const MAX_MESSAGES = 40; // seuls les derniers messages partent à Gemini ; le fil complet reste stocké
+const MEMOIRE_PLEINE = "Mémoire du téléphone pleine : efface des conversations.";
 
 const $ = (id) => document.getElementById(id);
-const etat = charger();
-let actuel = null, enCours = false;
+let base = null, etat = null;
+let actuelId = null;
+// Le coach ouvert, relu dans l'état à chaque fois : les objets sont remplacés après ajout, suppression ou import.
+const coachDe = (id) => (etat && id && etat.avatars.find((c) => c.id === id)) || null;
+const coachCourant = () => coachDe(actuelId);
 
 navigator.storage?.persist?.().catch(() => {});
 
 const initiales = (nom) => nom.split(/\s+/).filter(Boolean).map((m) => m[0]).slice(0, 2).join("").toUpperCase();
 
-let ecranCourant = "liste", sansConfirmer = false;
+let ecranCourant = "chargement", sansConfirmer = false;
 
 function montrer(nom) {
   ecranCourant = nom;
   document.querySelectorAll(".ecran").forEach((e) => e.classList.toggle("actif", e.id === `ecran-${nom}`));
 }
 
+// Photo ronde si le coach en a une (data-URL image seulement), sinon pastille de couleur avec initiales.
 function pastille(el, a, emotion) {
   el.style.background = a.couleur;
-  el.textContent = initiales(a.nom);
+  el.replaceChildren();
+  if (typeof a.photo === "string" && a.photo.startsWith("data:image/")) {
+    const img = document.createElement("img");
+    img.alt = ""; img.src = a.photo;
+    el.appendChild(img);
+  } else el.textContent = initiales(a.nom);
   if (emotion) {
     const s = document.createElement("span");
     s.className = "emo"; s.title = emotion; s.textContent = EMOJI[emotion] || "";
@@ -38,208 +44,94 @@ function pastille(el, a, emotion) {
   }
 }
 
-function dessinerListe() {
-  $("bandeau").hidden = !!etat.reglages.cle;
-  $("liste").replaceChildren(...etat.avatars.map((a) => {
-    const b = document.createElement("button");
-    b.className = "carte";
-    b.innerHTML = `<div class="pastille"></div><div><div class="nom"></div><div class="lien"></div></div>`;
-    pastille(b.querySelector(".pastille"), a);
-    b.querySelector(".nom").textContent = a.nom;
-    b.querySelector(".lien").textContent = a.lien;
-    b.onclick = () => ouvrir(a);
-    return b;
-  }));
+let delaiAlerte = 0;
+function alerte(texte) {
+  $("alerte").textContent = texte;
+  $("alerte").hidden = false;
+  clearTimeout(delaiAlerte);
+  delaiAlerte = setTimeout(() => { $("alerte").hidden = true; }, 6000);
 }
 
-function bulle(role, texte, classe = "") {
-  const d = document.createElement("div");
-  d.className = `bulle ${role} ${classe}`.trim();
-  d.textContent = texte;
-  $("fil").appendChild(d);
-  $("fil").scrollTop = $("fil").scrollHeight;
-  return d;
-}
-
-function entete() {
-  const conv = etat.conversations[actuel.id] || [];
-  const derniere = [...conv].reverse().find((m) => m.role === "avatar" && m.emotion);
-  pastille($("pastille"), actuel, derniere?.emotion || "neutre");
-  $("titre").querySelector(".nom").textContent = actuel.nom;
-  $("titre").querySelector(".etat").textContent = actuel.lien;
-}
-
-// Réponse en attente : { id, nom, texte }. L'époque change quand les conversations sont effacées ou les fiches importées.
-let attente = null, epoque = 0;
-
-function dessinerFil() {
-  $("fil").replaceChildren();
-  for (const m of etat.conversations[actuel.id] || []) bulle(m.role, m.texte);
-  if (attente && attente.id === actuel.id) {
-    bulle("user", attente.texte);
-    bulle("avatar", `${attente.nom.split(" ")[0]} écrit…`, "attente");
-  }
-}
-
-function dessinerSaisie() {
-  $("envoyer").disabled = enCours;
-  const ailleurs = enCours && attente.id !== actuel?.id;
-  $("message").placeholder = ailleurs ? `Attends la réponse de ${attente.nom.split(" ")[0]}…` : "Écris un message…";
+// Écrit l'état dans IndexedDB ; si le téléphone refuse, on prévient (l'appli reste utilisable).
+async function sauver(silencieux = false) {
+  const ok = await ecrireEtat(base, etat);
+  if (!ok && !silencieux) alerte(MEMOIRE_PLEINE);
+  return ok;
 }
 
 // Navigation : chaque écran quitté depuis la liste est une entrée d'historique,
 // pour que le bouton retour d'Android revienne en arrière au lieu de fermer l'appli.
-history.replaceState({ ecran: "liste" }, "");
 function aller(ecran) {
   history.pushState({ ecran }, "");
   afficher(ecran);
 }
 function afficher(ecran) {
-  if (ecran === "chat" && actuel) montrer("chat");
-  else if (ecran === "fiche" && actuel) montrer("fiche");
+  if (ecran === "chat" && coachCourant()) { appel.afficher(); montrer("chat"); }
+  else if (ecran === "fiche" && fiche.ouverte()) montrer("fiche");
   else if (ecran === "reglages") montrer("reglages");
-  else { dessinerListe(); montrer("liste"); }
+  else { equipe.dessiner(); montrer("liste"); }
 }
-const ficheModifiee = () => actuel && ($("f-nom").value !== actuel.nom || $("f-lien").value !== actuel.lien || $("f-fiche").value !== actuel.fiche);
-function retour(sans = false) {
+function retour(sans = false, n = 1) {
   sansConfirmer = sans;
-  history.back();
+  history.go(-n);
 }
 window.addEventListener("popstate", (e) => {
+  if (!etat) return;
   const cible = e.state?.ecran || "liste";
   const sans = sansConfirmer;
   sansConfirmer = false;
-  if (ecranCourant === "fiche" && cible !== "fiche" && !sans && ficheModifiee() && !confirm("Abandonner les modifications ?")) {
+  if (ecranCourant === "fiche" && cible !== "fiche" && !sans && fiche.modifiee() && !confirm("Abandonner les modifications ?")) {
     history.pushState({ ecran: "fiche" }, ""); // on reste sur la fiche
     return;
   }
   afficher(cible);
 });
 
-function ouvrir(a) {
-  if (actuel?.id !== a.id) $("message").value = ""; // le champ est partagé : on le vide en changeant d'avatar
-  actuel = a;
-  entete();
-  dessinerFil();
-  dessinerSaisie();
+function ouvrirChat(a) {
+  if (actuelId !== a.id) $("message").value = ""; // le champ est partagé : on le vide en changeant de coach
+  actuelId = a.id;
   aller("chat");
 }
 
-$("retour").onclick = () => retour();
+const ctx = {
+  $, pastille, sauver, aller, retour, alerte,
+  get etat() { return etat; },
+  get actuelId() { return actuelId; },
+  ecran: () => ecranCourant,
+  coachCourant,
+  coachDe,
+  rafraichirFiche: (id) => fiche?.rafraichir(id),
+  ouvrirChat,
+  ouvrirFiche: (a, origine) => fiche.ouvrir(a, origine),
+  apresSuppression(id) {
+    appel.apresSuppression(id);
+    if (actuelId === id) actuelId = null;
+  },
+  apresImport(avant) { appel.apresImport(avant); if (!coachCourant()) actuelId = null; },
+  apresEffacement() { appel.apresEffacement(); },
+};
+let equipe, appel, fiche, reglages;
 
-$("saisie").onsubmit = async (e) => {
-  e.preventDefault();
-  const texte = $("message").value.trim();
-  if (!texte || enCours) return;
-  const a = actuel, mon = epoque;
-  const messages = [...(etat.conversations[a.id] || []), { role: "user", texte }].map(({ role, texte }) => ({ role, texte })).slice(-MAX_MESSAGES);
-  while (messages[0].role !== "user") messages.shift(); // l'échange commence toujours par Nico
-  enCours = true;
-  attente = { id: a.id, nom: a.nom, texte };
-  $("message").value = "";
-  dessinerFil();
-  dessinerSaisie();
-  const r = await repondre({
-    cle: etat.reglages.cle,
-    systeme: construirePrompt(a, etat.commun, etat.reglages.prenom),
-    messages,
-  });
-  enCours = false;
-  attente = null;
-  if (mon !== epoque) { // données effacées ou remplacées pendant l'attente : la réponse est abandonnée
-    if (actuel) { dessinerFil(); dessinerSaisie(); }
+$("retour").onclick = () => retour();
+$("vers-fiche").onclick = () => { const c = coachCourant(); if (c) fiche.ouvrir(c, "chat"); };
+$("vers-reglages").onclick = () => reglages.ouvrir();
+$("bandeau").onclick = () => reglages.ouvrir();
+
+// Démarrage : ouverture de la base (avec migration de l'ancien localStorage), puis écran « Mon équipe ».
+(async () => {
+  try {
+    base = await ouvrirBase();
+    etat = normaliser(await lireEtat(base));
+  } catch {
+    $("chargement-texte").textContent = "Impossible d'ouvrir la mémoire du téléphone. Ferme puis rouvre l'appli.";
     return;
   }
-let plein = false;
-  if (!r.erreur) {
-    etat.conversations[a.id] = [...(etat.conversations[a.id] || []), { role: "user", texte }, { role: "avatar", texte: r.texte, emotion: r.emotion }];
-    plein = !sauver(etat);
-  }
-  if (actuel === a) {
-    dessinerFil();
-    if (plein) {
-      entete();
-      bulle("avatar", MEMOIRE_PLEINE, "erreur");
-    } else if (r.erreur) {
-      // Le message de Nico n'est gardé que si une réponse arrive : on le remet dans la saisie s'il n'a rien écrit d'autre.
-      if (!$("message").value) $("message").value = texte;
-      bulle("avatar", ERREURS[r.erreur] || "Une erreur est survenue.", "erreur");
-    } else entete();
-  }
-  if (actuel) dessinerSaisie();
-};
-
-// Fiche
-$("vers-fiche").onclick = () => {
-  $("f-nom").value = actuel.nom;
-  $("f-lien").value = actuel.lien;
-  $("f-fiche").value = actuel.fiche;
-  aller("fiche");
-};
-$("fiche-annuler").onclick = () => retour(true);
-$("fiche-ok").onclick = () => {
-  actuel.nom = $("f-nom").value.trim() || actuel.nom;
-  actuel.lien = $("f-lien").value.trim();
-  actuel.fiche = $("f-fiche").value;
-  sauver(etat);
-  entete();
-  retour(true);
-};
-
-// Réglages
-function ouvrirReglages() {
-  $("r-cle").value = etat.reglages.cle;
-  $("r-prenom").value = etat.reglages.prenom;
-  $("r-commun").value = etat.commun;
-  $("r-msg").textContent = "";
-  aller("reglages");
-}
-$("vers-reglages").onclick = ouvrirReglages;
-$("bandeau").onclick = ouvrirReglages;
-$("reglages-annuler").onclick = () => retour();
-$("reglages-ok").onclick = () => {
-  etat.reglages.cle = $("r-cle").value.trim();
-  etat.reglages.prenom = $("r-prenom").value.trim() || "Nico";
-  etat.commun = $("r-commun").value;
-  sauver(etat);
-  retour();
-};
-
-$("exporter").onclick = () => {
-  const nom = `avatar-fiches-${new Date().toLocaleDateString("sv-SE")}.json`; // AAAA-MM-JJ, date locale
-  const lien = document.createElement("a");
-  lien.href = URL.createObjectURL(new Blob([exporter(etat)], { type: "application/json" }));
-  lien.download = nom;
-  document.body.appendChild(lien);
-  lien.click();
-  lien.remove();
-  setTimeout(() => URL.revokeObjectURL(lien.href), 1000);
-  $("r-msg").textContent = `Fichier ${nom} créé.`;
-};
-
-$("importer").onclick = () => $("fichier").click();
-$("fichier").onchange = async () => {
-  const f = $("fichier").files[0];
-  $("fichier").value = "";
-  if (!f) return;
-  let contenu;
-  try { contenu = await f.text(); } catch { $("r-msg").textContent = "Impossible de lire le fichier."; return; }
-  const res = importer(etat, contenu);
-  if (!res.ok) { $("r-msg").textContent = res.erreur; return; }
-  Object.assign(etat, res.etat);
-  epoque++;
-  actuel = null;
-  sauver(etat);
-  $("r-commun").value = etat.commun;
-  $("r-msg").textContent = "Fiches importées.";
-};
-
-$("effacer").onclick = () => {
-  if (!confirm("Effacer toutes les conversations ? Les fiches sont gardées.")) return;
-  etat.conversations = {};
-  epoque++;
-  sauver(etat);
-  $("r-msg").textContent = "Conversations effacées.";
-};
-
-dessinerListe();
+  equipe = initEquipe(ctx);
+  appel = initAppel(ctx);
+  fiche = initFiche(ctx);
+  reglages = initReglages(ctx);
+  history.replaceState({ ecran: "liste" }, "");
+  afficher("liste");
+  window.avatarPret = true; // lu par le minuteur d'index.html
+  appel.resumerTout(); // séances restées sans résumé : en arrière-plan, sans bloquer l'écran
+})();

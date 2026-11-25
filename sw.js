@@ -1,7 +1,8 @@
 // Service worker d'Avatar : réseau d'abord, cache en secours (l'appli s'ouvre hors ligne).
-const CACHE = 'avatar-v3';
+const CACHE = 'avatar-v4';
 const FICHIERS = [
-  './', 'index.html', 'app.js', 'cerveau.js', 'donnees.js',
+  './', 'index.html', 'app.js', 'cerveau.js', 'donnees.js', 'stockage.js', 'voix.js', 'photo.js',
+  'ecran-equipe.js', 'ecran-appel.js', 'ecran-fiche.js', 'ecran-reglages.js',
   'manifest.webmanifest', 'icones/icone-192.png', 'icones/icone-512.png',
 ];
 

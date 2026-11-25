@@ -3,65 +3,111 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0F1722">
+<meta name="theme-color" content="#2B5288">
+<meta name="color-scheme" content="light dark">
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Newsreader:wght@500;600&display=swap">
 <title>Avatar</title>
 <style>
-  :root { --encre: #0F1722; --encre2: #1A2433; --encre3: #2B374A; --papier: #E9EDF2; --gris: #B2B8BE; --ambre: #E8A33D; }
+  /* Thème « ciel et soleil » : clair par défaut, sombre selon le téléphone. */
+  :root {
+    --barre: #2B5288; --or: #F2C230; --accent: #2F6FDB;
+    --fond: #F7F9FC; --carte: #FFFFFF; --bord: #D6DFEC;
+    --texte: #3D4F6B; --texte2: #5B6B82; --titre: #2B5288;
+    --av-fond: #FFF7DB; --av-texte: #6B5310; --danger: #B3261E;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fond: #0E1A2E; --carte: #172640; --bord: #2A3F63;
+      --texte: #D5DEEE; --texte2: #9FB0CC; --titre: #EAF0FA;
+      --av-fond: #3A3213; --av-texte: #F2DFA0; --danger: #FF8A80;
+    }
+  }
   * { box-sizing: border-box; margin: 0; }
   html, body { height: 100%; }
-  body { background: var(--encre); color: var(--papier); font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif; font-size: 16px; }
-  .ecran { display: none; height: 100dvh; flex-direction: column; max-width: 560px; margin: 0 auto; padding-top: env(safe-area-inset-top); }
+  body { background: var(--fond); color: var(--texte); font-family: Inter, Arial, system-ui, sans-serif; font-size: 16px; }
+  .ecran { display: none; height: 100dvh; flex-direction: column; max-width: 520px; margin: 0 auto; background: var(--fond); }
   .ecran.actif { display: flex; }
-  header { display: flex; align-items: center; gap: 12px; padding: 16px; border-bottom: 1px solid var(--encre3); }
-  h1 { font-family: Georgia, serif; font-size: 24px; flex: 1; }
-  .pastille { width: 48px; height: 48px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 700; color: var(--encre); position: relative; }
-  .pastille .emo { position: absolute; right: -6px; bottom: -6px; font-size: 18px; background: var(--encre); border-radius: 50%; width: 26px; height: 26px; display: grid; place-items: center; }
-  .icone { background: none; border: 0; color: var(--papier); font-size: 26px; cursor: pointer; padding: 4px 8px; min-width: 44px; min-height: 44px; }
+  header { display: flex; align-items: center; gap: 12px; padding: calc(12px + env(safe-area-inset-top)) 16px 12px; background: var(--barre); border-bottom: 3px solid var(--or); color: #fff; }
+  h1 { font-family: Newsreader, Georgia, serif; font-weight: 600; font-size: 24px; flex: 1; color: #fff; }
+  h2 { font-family: Newsreader, Georgia, serif; font-weight: 600; font-size: 19px; margin-top: 8px; color: var(--titre); }
+  .icone { background: none; border: 0; color: #fff; font-size: 26px; cursor: pointer; padding: 4px 8px; min-width: 44px; min-height: 44px; }
   .corps { flex: 1; overflow-y: auto; padding: 16px; display: grid; gap: 12px; align-content: start; }
-  #liste { display: grid; gap: 12px; }
-  .carte { display: flex; align-items: center; gap: 14px; padding: 14px; background: var(--encre2); border: 1px solid var(--encre3); border-radius: 16px; color: inherit; font: inherit; text-align: left; cursor: pointer; width: 100%; }
-  .carte:active, .carte:focus-visible { border-color: var(--ambre); outline: none; }
-  .carte .nom { font-weight: 600; }
-  .carte .lien { color: var(--gris); font-size: 14px; margin-top: 2px; }
-  .bandeau { background: var(--encre2); border: 1px solid var(--ambre); border-radius: 12px; padding: 12px 14px; color: var(--papier); font: inherit; text-align: left; width: 100%; cursor: pointer; }
-  .bandeau[hidden] { display: none; }
-  .note { color: var(--gris); font-size: 13px; padding: 0 16px 16px; }
+  .pastille { width: 48px; height: 48px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 700; color: #fff; position: relative; }
+  .pastille img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+  .pastille.grande { width: 88px; height: 88px; font-size: 28px; }
+  .pastille .emo { position: absolute; right: -6px; bottom: -6px; font-size: 18px; background: var(--barre); border-radius: 50%; width: 26px; height: 26px; display: grid; place-items: center; }
+
+  .avert { background: var(--av-fond); border: 1px solid var(--or); border-radius: 12px; padding: 12px 14px; color: var(--av-texte); font: inherit; font-size: 15px; text-align: left; width: 100%; }
+  button.avert { cursor: pointer; }
+  .avert[hidden] { display: none; }
+  #liste { display: grid; gap: 10px; }
+  .carte { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--carte); border: 1px solid var(--bord); border-radius: 12px; color: var(--texte); cursor: pointer; width: 100%; }
+  .carte:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .carte input[type=checkbox] { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
+  .carte .texte { flex: 1; min-width: 0; }
+  .carte .nom { font-weight: 600; color: var(--titre); }
+  .carte .lien { color: var(--texte2); font-size: 14px; margin-top: 2px; }
+  .carte .cerveau { font-size: 16px; }
+  .carte .icone { color: var(--accent); font-size: 22px; }
+  #chargement-texte { margin: auto; color: var(--texte2); }
+
   #titre { flex: 1; min-width: 0; }
   #titre .nom { font-weight: 600; }
-  #titre .etat { color: var(--gris); font-size: 13px; }
+  #titre .etat { color: #D6E2F5; font-size: 13px; }
   #fil { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
   .bulle { max-width: 80%; padding: 10px 14px; border-radius: 18px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
-  .bulle.user { align-self: flex-end; background: var(--ambre); color: var(--encre); border-bottom-right-radius: 4px; }
-  .bulle.avatar { align-self: flex-start; background: var(--encre2); border: 1px solid var(--encre3); border-bottom-left-radius: 4px; }
-  .bulle.attente { color: var(--gris); font-style: italic; }
-  .bulle.erreur { border-color: var(--ambre); color: var(--ambre); }
-  #saisie { display: flex; gap: 8px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--encre3); }
-  input, textarea { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--encre3); background: var(--encre2); color: var(--papier); font: inherit; font-size: 16px; width: 100%; }
+  .bulle.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+  .bulle.avatar { align-self: flex-start; background: var(--carte); border: 1px solid var(--bord); border-bottom-left-radius: 4px; }
+  .bulle.attente { color: var(--texte2); font-style: italic; }
+  .bulle.erreur { background: var(--av-fond); border-color: var(--or); color: var(--av-texte); }
+  .souvenir { padding: 6px 16px; font-size: 13px; font-style: italic; color: var(--texte2); background: var(--fond); overflow-wrap: anywhere; }
+  .souvenir[hidden] { display: none; }
+  .pied.bas { border-top: 0; padding-top: 0; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+  #saisie { display: flex; gap: 8px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--bord); background: var(--carte); }
+
+  input, textarea, select { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--bord); background: var(--carte); color: var(--texte); font: inherit; font-size: 16px; width: 100%; }
+  input[type=checkbox] { flex: none; width: 20px; height: 20px; padding: 0; accent-color: var(--accent); }
   #message { border-radius: 24px; }
-  input:focus, textarea:focus { outline: none; border-color: var(--ambre); }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0; }
   textarea { resize: vertical; line-height: 1.4; }
-  label { display: grid; gap: 6px; color: var(--gris); font-size: 14px; }
-  .bouton { border: 0; border-radius: 24px; padding: 12px 18px; background: var(--ambre); color: var(--encre); font: inherit; font-weight: 700; cursor: pointer; }
-  .bouton:disabled { opacity: .5; }
-  .bouton.second { background: var(--encre2); color: var(--papier); border: 1px solid var(--encre3); }
-  .rang { display: flex; gap: 8px; flex-wrap: wrap; }
-  .pied { display: flex; gap: 8px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--encre3); }
+  label { display: grid; gap: 6px; color: var(--texte2); font-size: 14px; }
+  label.case { display: flex; align-items: center; gap: 10px; font-size: 15px; color: var(--texte); }
+  .bouton { border: 0; border-radius: 24px; padding: 12px 18px; background: var(--accent); color: #fff; font: inherit; font-weight: 700; cursor: pointer; min-height: 44px; }
+  .bouton:disabled { opacity: .45; cursor: default; }
+  .bouton.second { background: var(--carte); color: var(--accent); border: 1px solid var(--bord); }
+  .bouton.danger { color: var(--danger); }
+  .rang { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .pied { display: flex; gap: 8px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--bord); background: var(--carte); }
   .pied .bouton { flex: 1; }
-  #f-fiche { min-height: 40dvh; }
-  .msg { color: var(--ambre); font-size: 14px; min-height: 1em; }
-  h2 { font-family: Georgia, serif; font-size: 18px; margin-top: 8px; }
+  #f-fiche { min-height: 30dvh; }
+  .msg { color: var(--av-texte); font-size: 14px; min-height: 1em; }
+  @media (prefers-color-scheme: dark) { .msg { color: var(--or); } }
+  #souvenirs { list-style: none; padding: 0; display: grid; gap: 8px; }
+  #souvenirs li { display: flex; align-items: flex-start; gap: 8px; background: var(--carte); border: 1px solid var(--bord); border-radius: 12px; padding: 8px 8px 8px 14px; }
+  #souvenirs li span { flex: 1; padding-top: 8px; overflow-wrap: anywhere; }
+  #souvenirs .icone { color: var(--texte2); font-size: 22px; }
+  .vide { color: var(--texte2); font-size: 14px; }
+  #alerte { position: fixed; left: 50%; bottom: calc(80px + env(safe-area-inset-bottom)); transform: translateX(-50%); max-width: 480px; width: calc(100% - 32px); z-index: 5; }
 </style>
 </head>
 <body>
 
-<section id="ecran-liste" class="ecran actif">
-  <header><h1>Mes proches</h1><button class="icone" id="vers-reglages" aria-label="Réglages">⚙</button></header>
+<section id="ecran-chargement" class="ecran actif"><p id="chargement-texte">Chargement…</p></section>
+
+<section id="ecran-liste" class="ecran">
+  <header><h1>Mon équipe</h1><button class="icone" id="vers-reglages" aria-label="Réglages">⚙</button></header>
   <div class="corps">
-    <button id="bandeau" class="bandeau" hidden>Ajoute ta clé Gemini dans Réglages.</button>
+    <div class="avert">Coachs, pas des pros. En cas de détresse : 3114 (gratuit, 24 h/24) ou 15.</div>
+    <button id="bandeau" class="avert" hidden>Ajoute ta clé Gemini dans Réglages.</button>
     <div id="liste"></div>
+    <button class="bouton second" id="ajouter" type="button">+ Ajouter un coach</button>
   </div>
-  <p class="note">Avatars fictifs pour tester l’appli.</p>
+  <div class="pied">
+    <button class="bouton" id="appeler" type="button" disabled>Appeler</button>
+    <button class="bouton second" id="conference" type="button" disabled>Conférence (bientôt)</button>
+  </div>
 </section>
 
 <section id="ecran-chat" class="ecran">
@@ -72,18 +118,32 @@
     <button class="icone" id="vers-fiche" aria-label="Modifier la fiche">✎</button>
   </header>
   <div id="fil" aria-live="polite"></div>
+  <div id="souvenir" class="souvenir" hidden></div>
   <form id="saisie">
     <input id="message" autocomplete="off" placeholder="Écris un message…" aria-label="Message">
     <button class="bouton" id="envoyer" type="submit">Envoyer</button>
   </form>
+  <div class="pied bas"><button class="bouton second" id="terminer" type="button">Terminer la séance</button></div>
 </section>
 
 <section id="ecran-fiche" class="ecran">
   <header><h1>Fiche</h1></header>
   <div class="corps">
+    <div class="rang">
+      <div id="f-photo" class="pastille grande"></div>
+      <button class="bouton second" id="f-choisir" type="button">Choisir une photo</button>
+      <input id="f-fichier" type="file" accept="image/*" hidden>
+    </div>
+    <div class="msg" id="f-msg" role="status"></div>
     <label>Nom<input id="f-nom"></label>
-    <label>Lien avec toi<input id="f-lien"></label>
+    <label>Rôle<input id="f-lien"></label>
     <label>Fiche (texte libre)<textarea id="f-fiche"></textarea></label>
+    <label>Voix<select id="f-voix"></select></label>
+    <label>Description de la voix<input id="f-voix-desc" placeholder="ex. posée, un peu rieuse"></label>
+    <h2 id="f-titre-souvenirs"></h2>
+    <ul id="souvenirs"></ul>
+    <button class="bouton second" id="f-annuler-mem" type="button" hidden>Annuler la dernière mise à jour</button>
+    <button class="bouton second danger" id="f-supprimer" type="button">Supprimer ce coach</button>
   </div>
   <div class="pied">
     <button class="bouton second" id="fiche-annuler" type="button">Annuler</button>
@@ -94,10 +154,13 @@
 <section id="ecran-reglages" class="ecran">
   <header><h1>Réglages</h1></header>
   <div class="corps">
+    <div class="avert" id="r-gratuite">Clé gratuite : Google peut lire tes échanges.</div>
+    <label class="case"><input type="checkbox" id="r-payante"> J'utilise une clé payante</label>
     <label>Clé Gemini<input id="r-cle" type="password" autocomplete="off"></label>
     <label>Ton prénom<input id="r-prenom"></label>
     <label>Ce que tous savent<textarea id="r-commun" rows="8"></textarea></label>
-    <h2>Fiches</h2>
+    <h2>Coachs</h2>
+    <div class="avert" id="r-rappel" hidden>Pense à sauvegarder tes coachs (Exporter).</div>
     <div class="rang">
       <button class="bouton second" id="exporter" type="button">Exporter</button>
       <button class="bouton second" id="importer" type="button">Importer</button>
@@ -112,7 +175,16 @@
   </div>
 </section>
 
+<div id="alerte" class="avert" role="alert" hidden></div>
+
 <script type="module" src="app.js"></script>
+<script>
+// Si le démarrage n'a pas abouti après 10 s (fichiers de deux versions mélangés), on le dit au lieu de rester sur « Chargement… ».
+setTimeout(() => {
+  const t = document.getElementById("chargement-texte");
+  if (!window.avatarPret && t && t.textContent.startsWith("Chargement")) t.textContent = "Mise à jour incomplète : ferme puis rouvre l'appli";
+}, 10000);
+</script>
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => {}); });
