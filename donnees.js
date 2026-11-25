@@ -127,7 +127,7 @@ export function charger(stockage = localStorage) {
   return {
     avatars: completer(Array.isArray(d.avatars) && d.avatars.length ? d.avatars : [], supprimes),
     commun: typeof d.commun === "string" ? d.commun : COMMUN_DEPART,
-    reglages: { cle: "", prenom: "Nico", ...r },
+    reglages: { cle: "", prenom: "Nico", voixActive: true, ...r },
     conversations: d.conversations && typeof d.conversations === "object" ? d.conversations : {},
     ...(supprimes.length ? { supprimes } : {}),
   };
@@ -186,7 +186,7 @@ export function normaliser(etat) {
     avatars: [...avatars, ...manquants],
     supprimes,
     commun: typeof e.commun === "string" ? e.commun : COMMUN_DEPART,
-    reglages: { cle: "", prenom: "Nico", clePayante: false, dernierExport: null, ...(e.reglages && typeof e.reglages === "object" ? e.reglages : {}) },
+    reglages: { cle: "", prenom: "Nico", clePayante: false, dernierExport: null, voixActive: true, ...(e.reglages && typeof e.reglages === "object" ? e.reglages : {}) },
     conversations: e.conversations && typeof e.conversations === "object" && !Array.isArray(e.conversations) ? e.conversations : {},
     conferences: Array.isArray(e.conferences) ? e.conferences : [],
     aResumer: Array.isArray(e.aResumer) ? e.aResumer : [],

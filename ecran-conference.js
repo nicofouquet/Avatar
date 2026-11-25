@@ -1,8 +1,8 @@
 // Écran « Conférence » : 2 à 4 coachs discutent avec Nico. Un meneur invisible choisit qui parle (1 ou 2 coachs par tour).
-// Texte seulement (pas de voix). Les conférences sont gardées dans etat.conferences et se rouvrent depuis « Mon équipe ».
+// Les coachs parlent à voix haute (haut-parleur coupable) ; les voix s'enchaînent dans l'ordre des orateurs. Les conférences sont gardées dans etat.conferences et se rouvrent depuis « Mon équipe ».
 import { construirePrompt, repondre, choisirOrateurs, detecterDetresse, resumerMemoire } from "./cerveau.js";
 import { ajouterSouvenirs, messagesNicoConf, noterResumesConf, terminerResumeConf, entreesConfConservees } from "./donnees.js";
-import { ERREURS, ETATS, MEMOIRE_PLEINE, DELAI_RESUME, MAX_MESSAGES, prenomDe, creerDictee } from "./commun-ecrans.js";
+import { ERREURS, ETATS, MEMOIRE_PLEINE, DELAI_RESUME, MAX_MESSAGES, prenomDe, creerDictee, creerVoixEcran } from "./commun-ecrans.js";
 
 const RELANCE = "Continue la conversation.";
 const SILENCE = "(Le participant ne dit rien : laisse les coachs réagir entre eux.)";
@@ -129,6 +129,7 @@ export function initConference(ctx) {
       const erreur = erreurs.find((r) => r.coach === a.id);
       if (cours && courant === a.id) { carte.classList.add("parle"); etat.textContent = "écrit…"; }
       else if (erreur) { carte.classList.add("erreur"); etat.textContent = ERREURS[erreur.erreur] || "Une erreur est survenue."; }
+      else if (prepare.has(a.id)) etat.textContent = "prépare sa voix…";
       else etat.textContent = ETATS[emotion || "neutre"];
       texte.append(nom, etat);
       carte.append(pastille, texte);
@@ -176,9 +177,21 @@ export function initConference(ctx) {
   const dessiner = () => { dessinerGrille(); dessinerFil(); dessinerSaisie(); };
   const redessiner = () => { if (montre() && conf()) dessiner(); };
 
+  // ---------- Voix des orateurs ----------
+  // Pendant la synthèse, « prépare sa voix… » remplace l'état du coach sur sa carte.
+  const prepare = new Set();
+  const voix = creerVoixEcran({
+    ctx, bouton: $("conf-voix"), indicateur: $("conf-voix-secours"), ecran: "conference", contexte: () => confId, ecoute: () => dictee.enEcoute(),
+    surPrepare: (cle, v) => {
+      if (cle === null) prepare.clear(); else if (v) prepare.add(cle); else prepare.delete(cle);
+      if (montre() && conf()) dessinerGrille();
+    },
+  });
+
   // ---------- Dictée au micro ----------
   const dictee = creerDictee({
     ctx, champ: $("conf-message"), bouton: $("conf-micro"), ecran: "conference", contexte: () => confId, majSaisie: dessinerSaisie,
+    avantEcoute: () => { voix.arreter(); voix.deverrouiller(); },
   });
 
   // ---------- Un tour ----------
@@ -188,6 +201,8 @@ export function initConference(ctx) {
     if (!c || enCours) return;
     const mon = epoque, id = c.id;
     dictee.couper(); // la dictée en cours ne doit pas réécrire la saisie après l'envoi
+    voix.arreter(); // Nico reprend la parole : les coachs se taisent
+    voix.deverrouiller(); // geste de Nico : l'audio pourra démarrer après l'attente de Gemini
     erreurs = [];
     enCours = { conf: id, texte, parlants: [], recus: [] };
     const cours = enCours;
@@ -203,6 +218,7 @@ export function initConference(ctx) {
         surReponse: (r) => {
           if (mon !== epoque) return;
           cours.recus.push(r);
+          if (!r.erreur && confId === id) voix.lire({ texte: r.texte, emotion: r.emotion, voix: ctx.coachDe(r.coach)?.voix, cle: r.coach }); // texte déjà affiché ; synthèse tout de suite, lecture dans l'ordre
           if (r.erreur && confId === id) erreurs.push(r);
           redessiner();
         },
@@ -236,7 +252,7 @@ export function initConference(ctx) {
     if (texte) lancer(texte);
   };
   $("conf-reagir").onclick = () => lancer("");
-  $("conf-retour").onclick = () => { dictee.couper(); ctx.retour(); };
+  $("conf-retour").onclick = () => { dictee.couper(); voix.arreter(); ctx.retour(); };
 
   // ---------- Résumés de mémoire ----------
 
@@ -286,7 +302,7 @@ export function initConference(ctx) {
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && ctx.etat) resumerTout(); });
 
   $("conf-terminer").onclick = async () => {
-    dictee.couper();
+    dictee.couper(); voix.arreter();
     const c = conf();
     ctx.retour();
     if (!c || !ctx.etat.conferences.includes(c)) return; // brouillon sans réponse : rien à garder
@@ -318,18 +334,18 @@ export function initConference(ctx) {
       ouvrirEcran();
     },
     ouverte: () => !!conf(),
-    afficher() { dictee.couper(); dessiner(); },
+    afficher() { dictee.couper(); voix.arreter(); voix.dessiner(); dessiner(); },
     resumerTout,
     // Les conférences sont effacées avec les conversations ; les résumés en attente n'ont plus d'objet.
     apresEffacement() {
-      epoque++;
+      epoque++; voix.arreter();
       ctx.etat.conferences = [];
       ctx.etat.aResumerConf = [];
       brouillon = null; confId = null; erreurs = [];
     },
     // Après un import : les conférences ont pu être remplacées ; on garde seulement les résumés dont la conférence et le coach existent.
     apresImport(avantConferences) {
-      epoque++;
+      epoque++; voix.arreter();
       const e = ctx.etat;
       e.aResumerConf = entreesConfConservees(e.aResumerConf, avantConferences, e.conferences, e.avatars);
       brouillon = null; confId = null; erreurs = [];

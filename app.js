@@ -24,8 +24,10 @@ const initiales = (nom) => nom.split(/\s+/).filter(Boolean).map((m) => m[0]).sli
 
 let ecranCourant = "chargement", sansConfirmer = false;
 
+const ecouteursEcran = [];
 function montrer(nom) {
   ecranCourant = nom;
+  for (const f of ecouteursEcran) f(nom);
   document.querySelectorAll(".ecran").forEach((e) => e.classList.toggle("actif", e.id === `ecran-${nom}`));
 }
 
@@ -133,6 +135,7 @@ const ctx = {
   get etat() { return etat; },
   get actuelId() { return actuelId; },
   ecran: () => ecranCourant,
+  surEcran: (f) => ecouteursEcran.push(f),
   coachCourant,
   coachDe,
   rafraichirFiche: (id) => fiche?.rafraichir(id),

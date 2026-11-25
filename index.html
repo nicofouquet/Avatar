@@ -53,7 +53,11 @@
   .carte .icone { color: var(--accent); font-size: 22px; }
   #chargement-texte { margin: auto; color: var(--texte2); }
 
+  .secours-voix { color: #D6E2F5; font-size: 11px; opacity: .85; }
+  .secours-voix[hidden] { display: none; }
+  .secours-voix { white-space: nowrap; }
   #titre { flex: 1; min-width: 0; }
+  #titre .nom, #titre .etat, #titre .secours-voix { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #titre .nom { font-weight: 600; }
   #titre .etat { color: #D6E2F5; font-size: 13px; }
   #fil, #conf-fil { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
@@ -140,7 +144,8 @@
   <header>
     <button class="icone" id="retour" aria-label="Retour à la liste">‹</button>
     <div id="pastille" class="pastille"></div>
-    <div id="titre"><div class="nom"></div><div class="etat"></div></div>
+    <div id="titre"><div class="nom"></div><div class="etat"></div><div class="secours-voix" id="voix-secours" hidden>voix de secours</div></div>
+    <button class="icone" id="voix" type="button" aria-pressed="true" aria-label="Couper la voix">🔊</button>
     <button class="icone" id="vers-fiche" aria-label="Modifier la fiche">✎</button>
   </header>
   <div id="fil" aria-live="polite"></div>
@@ -157,6 +162,8 @@
   <header>
     <button class="icone" id="conf-retour" aria-label="Retour à la liste">‹</button>
     <h1>Conférence</h1>
+    <span class="secours-voix" id="conf-voix-secours" hidden>voix de secours</span>
+    <button class="icone" id="conf-voix" type="button" aria-pressed="true" aria-label="Couper la voix">🔊</button>
   </header>
   <div id="conf-grille"></div>
   <div id="conf-fil" aria-live="polite"></div>

@@ -1,7 +1,7 @@
 // Écran « Appel » (version texte) : fil de conversation, état du coach, mémoire, fin de séance et résumés.
 import { construirePrompt, repondre, resumerMemoire } from "./cerveau.js";
 import { ajouterSouvenirs, messagesAResumer, noterSeance, terminerSeance, entreesConservees } from "./donnees.js";
-import { ERREURS, ETATS, MEMOIRE_PLEINE, DELAI_RESUME, MAX_MESSAGES, prenomDe, creerDictee } from "./commun-ecrans.js";
+import { ERREURS, ETATS, MEMOIRE_PLEINE, DELAI_RESUME, MAX_MESSAGES, prenomDe, creerDictee, creerVoixEcran } from "./commun-ecrans.js";
 
 export function initAppel(ctx) {
   const { $ } = ctx;
@@ -26,7 +26,7 @@ export function initAppel(ctx) {
     const emotion = derniere && ETATS[derniere.emotion] ? derniere.emotion : "neutre";
     ctx.pastille($("pastille"), actuel, emotion, true);
     $("titre").querySelector(".nom").textContent = actuel.nom;
-    $("titre").querySelector(".etat").textContent = ETATS[emotion];
+    $("titre").querySelector(".etat").textContent = prepare ? "prépare sa voix…" : ETATS[emotion];
     const lignes = String(actuel.memoire?.texte || "").split("\n").map((l) => l.trim()).filter(Boolean).slice(-2);
     $("souvenir").hidden = !lignes.length;
     $("souvenir").textContent = lignes.length ? `${prenomDe(actuel.nom)} se souvient : ${lignes.map((l) => `« ${l} »`).join(" ")}` : "";
@@ -49,13 +49,22 @@ export function initAppel(ctx) {
     $("message").placeholder = dictee.enEcoute() ? "Je t'écoute…" : ailleurs ? `Attends la réponse de ${prenomDe(attente.nom)}…` : "Écris un message…";
   }
 
+  // ---------- Voix du coach ----------
+  // Pendant la synthèse, « prépare sa voix… » remplace l'état du coach dans le bandeau.
+  let prepare = false;
+  const voix = creerVoixEcran({
+    ctx, bouton: $("voix"), indicateur: $("voix-secours"), ecran: "chat", contexte: () => ctx.actuelId, ecoute: () => dictee.enEcoute(),
+    surPrepare: (cle, v) => { prepare = v; if (ctx.ecran() === "chat") entete(); },
+  });
+
   // ---------- Dictée au micro ----------
   const dictee = creerDictee({
     ctx, champ: $("message"), bouton: $("micro"), ecran: "chat", contexte: () => ctx.actuelId, majSaisie: dessinerSaisie,
+    avantEcoute: () => { voix.arreter(); voix.deverrouiller(); },
   });
   const couperMicro = dictee.couper;
 
-  function afficher() { couperMicro(); entete(); dessinerFil(); dessinerSaisie(); }
+  function afficher() { couperMicro(); voix.arreter(); voix.dessiner(); entete(); dessinerFil(); dessinerSaisie(); }
   const redessiner = () => { if (ctx.actuelId) { dessinerFil(); dessinerSaisie(); } };
 
   // ---------- Résumés de séance ----------
@@ -100,6 +109,7 @@ export function initAppel(ctx) {
   $("terminer").onclick = () => {
     const id = ctx.actuelId;
     couperMicro();
+    voix.arreter();
     ctx.retour();
     if (id) resumer(id); // en arrière-plan : l'interface n'attend pas Gemini
   };
@@ -114,6 +124,8 @@ export function initAppel(ctx) {
     const a = ctx.coachCourant(), mon = epoque;
     if (!a) return;
     couperMicro(); // la dictée en cours ne doit pas réécrire la saisie après l'envoi
+    voix.arreter(); // Nico reprend la parole : le coach se tait
+    voix.deverrouiller(); // geste de Nico : l'audio pourra démarrer après l'attente de Gemini
     const messages = [...(etat.conversations[a.id] || []), { role: "user", texte }].map(({ role, texte }) => ({ role, texte })).slice(-MAX_MESSAGES);
     while (messages[0].role !== "user") messages.shift(); // l'échange commence toujours par Nico
     enCours = true;
@@ -148,7 +160,10 @@ export function initAppel(ctx) {
         // Le message de Nico n'est gardé que si une réponse arrive : on le remet dans la saisie s'il n'a rien écrit d'autre.
         if (!$("message").value) $("message").value = texte;
         bulle("avatar", ERREURS[r.erreur] || "Une erreur est survenue.", "erreur");
-      } else entete();
+      } else {
+        entete();
+        voix.lire({ texte: r.texte, emotion: r.emotion, voix: ctx.coachDe(a.id).voix }); // le texte est déjà affiché : la voix suit
+      }
     }
     if (ctx.actuelId) dessinerSaisie();
   };
@@ -156,9 +171,9 @@ export function initAppel(ctx) {
   return {
     afficher,
     resumerTout,
-    apresSuppression(id) { if (attente?.id === id) epoque++; },
+    apresSuppression(id) { voix.arreter(); if (attente?.id === id) epoque++; },
     // Les index « depuis » ne valent plus rien quand les conversations sont remplacées ou effacées.
-    apresImport(avant) { epoque++; ctx.etat.aResumer = entreesConservees(ctx.etat.aResumer, avant, ctx.etat.conversations, ctx.etat.avatars); },
-    apresEffacement() { epoque++; ctx.etat.aResumer = []; },
+    apresImport(avant) { epoque++; voix.arreter(); ctx.etat.aResumer = entreesConservees(ctx.etat.aResumer, avant, ctx.etat.conversations, ctx.etat.avatars); },
+    apresEffacement() { epoque++; voix.arreter(); ctx.etat.aResumer = []; },
   };
 }
