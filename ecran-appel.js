@@ -1,7 +1,7 @@
 // Écran « Appel » (version texte) : fil de conversation, état du coach, mémoire, fin de séance et résumés.
 import { construirePrompt, repondre, resumerMemoire } from "./cerveau.js";
 import { ajouterSouvenirs, messagesAResumer, noterSeance, terminerSeance, entreesConservees } from "./donnees.js";
-import { ERREURS, ETATS, MEMOIRE_PLEINE, DELAI_RESUME, MAX_MESSAGES, prenomDe, creerDictee, creerVoixEcran } from "./commun-ecrans.js";
+import { ERREURS, ETATS, MEMOIRE_PLEINE, DELAI_RESUME, MAX_MESSAGES, prenomDe, resumesEnPause, pauserResumes, creerDictee, creerVoixEcran } from "./commun-ecrans.js";
 
 export function initAppel(ctx) {
   const { $ } = ctx;
@@ -78,6 +78,7 @@ export function initAppel(ctx) {
     const coach = ctx.coachDe(id);
     const messages = coach ? messagesAResumer(ctx.etat.conversations[id], entree.depuis) : [];
     if (!messages.length) { retirer(); await ctx.sauver(true); return; } // coach supprimé ou conversation effacée
+    if (resumesEnPause()) return; // un résumé a raté il y a peu : l'entrée reste, on réessaiera plus tard
     enResume.add(id);
     let faits, minuteur;
     try {
@@ -85,7 +86,7 @@ export function initAppel(ctx) {
       const delai = new Promise((r) => { minuteur = setTimeout(() => r(null), DELAI_RESUME); });
       faits = await Promise.race([resumerMemoire({ cle: ctx.etat.reglages.cle, coach, prenom: ctx.etat.reglages.prenom, messages }), delai]);
     } catch { faits = null; } finally { clearTimeout(minuteur); enResume.delete(id); }
-    if (!faits) return; // erreur, quota, hors ligne : l'entrée reste pour un prochain essai
+    if (!faits) { pauserResumes(); return; } // erreur, quota, hors ligne : l'entrée reste pour un prochain essai
     // Tout a pu changer pendant l'attente : on relit le coach et l'entrée par identifiant.
     const cible = ctx.coachDe(id);
     // L'entrée peut avoir été recopiée (coach ajouté ou supprimé) : on la retrouve par identifiant et début.

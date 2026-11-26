@@ -15,6 +15,13 @@ export const ETATS = {
 export const MEMOIRE_PLEINE = "Mémoire du téléphone pleine : efface des conversations.";
 export const DELAI_RESUME = 40000; // ms : une requête de résumé qui ne répond jamais ne bloque rien
 export const MAX_MESSAGES = 40; // seuls les derniers messages partent à Gemini ; le fil complet reste stocké
+// Après un résumé raté (quota, réseau), pas d'autre tentative avant un moment : évite de multiplier les requêtes refusées.
+// Partagé par l'appel et la conférence ; les entrées restent en attente (reprises au lancement suivant ou après la pause).
+export const PAUSE_RESUME = 10 * 60 * 1000;
+let pasDeResumeAvant = 0;
+export const resumesEnPause = (maintenant = Date.now()) => maintenant < pasDeResumeAvant;
+export const pauserResumes = (maintenant = Date.now(), duree = PAUSE_RESUME) => { pasDeResumeAvant = maintenant + duree; };
+export const reprendreResumes = () => { pasDeResumeAvant = 0; };
 export const prenomDe = (nom) => String(nom).split(/\s+/)[0] || String(nom);
 
 const MICRO = {

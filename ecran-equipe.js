@@ -18,7 +18,7 @@ export function initEquipe(ctx) {
       const b = document.createElement("button");
       b.type = "button"; b.className = "carte conf-passee";
       const quand = new Date(c.date);
-      const date = Number.isNaN(quand.getTime()) ? "" : quand.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+      const date = Number.isNaN(quand.getTime()) ? "" : `${quand.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} ${quand.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
       const noms = c.participants.map((id) => { const a = ctx.etat.avatars.find((x) => x.id === id); return a ? a.nom.split(/\s+/)[0] : id; });
       b.textContent = [date, noms.join(", ")].filter(Boolean).join(" · ");
       b.onclick = () => ctx.rouvrirConference(c);

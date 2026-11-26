@@ -1,5 +1,5 @@
 // Écran « Réglages » : clé, service portraits (adresse, mot de passe), prénom, texte commun, rappels de confidentialité et d'export, export / import.
-import { exporter, importer, conversationsPerdues } from "./donnees.js";
+import { exporter, importer, conversationsPerdues, conferencesPerdues } from "./donnees.js";
 import { URL_PORTRAITS } from "./portrait.js";
 
 const TRENTE_JOURS = 30 * 24 * 3600 * 1000;
@@ -33,7 +33,8 @@ export function initReglages(ctx) {
     const etat = ctx.etat;
     etat.reglages.cle = $("r-cle").value.trim();
     etat.reglages.prenom = $("r-prenom").value.trim() || "Nico";
-    etat.reglages.portraitUrl = $("r-portrait-url").value.trim() || URL_PORTRAITS;
+    const url = $("r-portrait-url").value.trim();
+    etat.reglages.portraitUrl = url === URL_PORTRAITS ? "" : url; // l'adresse par défaut n'est pas figée : celle du code reste valable
     etat.reglages.portraitMotDePasse = $("r-portrait-mdp").value.trim();
     etat.reglages.clePayante = $("r-payante").checked;
     etat.commun = $("r-commun").value;
@@ -71,10 +72,10 @@ export function initReglages(ctx) {
     let v2 = false;
     try { v2 = JSON.parse(contenu).version === 2; } catch { /* déjà validé par importer */ }
     if (v2) {
-      const perdues = conversationsPerdues(etat.conversations, res.etat.conversations);
-      const texte = perdues
-        ? "Ce fichier remplacera tes coachs (fiches, photos, mémoires) et tes conversations. Continuer ?"
-        : "Ce fichier remplacera tes coachs (fiches, photos, mémoires). Continuer ?";
+      const parties = ["tes coachs (fiches, photos, mémoires)"];
+      if (conversationsPerdues(etat.conversations, res.etat.conversations)) parties.push("tes conversations");
+      if (conferencesPerdues(etat.conferences, res.etat.conferences)) parties.push("tes conférences");
+      const texte = `Ce fichier remplacera ${parties.length > 1 ? `${parties.slice(0, -1).join(", ")} et ${parties[parties.length - 1]}` : parties[0]}. Continuer ?`;
       if (!confirm(texte)) return;
     }
     const avant = etat.conversations; // l'ancien objet reste intact : importer a travaillé sur une copie

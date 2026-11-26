@@ -204,6 +204,7 @@ Réponds uniquement en JSON : {"faits": ["...", ...]}`;
     messages: [{ role: "user", texte: transcription(messages, prenom, coach.nom) }],
     schema: { type: "object", properties: { faits: { type: "array", items: { type: "string" } } }, required: ["faits"] },
     fetch,
+    tours: 1, // un résumé n'est pas urgent : un seul passage (il sera retenté plus tard)
   });
   if (r.erreur) return null;
   let faits;

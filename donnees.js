@@ -149,6 +149,10 @@ export function sauver(etat, stockage = localStorage) {
 
 // ---------- Normalisation ----------
 
+// Un coach créé par Nico (drapeau « neuf ») n'est jamais un coach de départ, même s'il reprend l'id « leo » ou « gaby »
+// après la suppression du premier : il n'a pas la photo de départ.
+const vraiDepart = (a) => !a.neuf;
+
 function normaliserCoach(a) {
   const depart = COACHS_DEPART.find((c) => c.id === a.id);
   const voix = a.voix && typeof a.voix === "object" ? a.voix : {};
@@ -157,7 +161,7 @@ function normaliserCoach(a) {
   return {
     ...a,
     fiche: majFiche(a.fiche),
-    photo: photoValide(a.photo) ? a.photo : (PHOTO_DEPART[a.id] ?? null), // photo de départ : Léo et Gaby seulement, s'ils n'en ont pas
+    photo: photoValide(a.photo) ? a.photo : (vraiDepart(a) ? PHOTO_DEPART[a.id] : null), // photo de départ : le vrai Léo / la vraie Gaby seulement, s'ils n'en ont pas
     voix: {
       nom: typeof voix.nom === "string" ? voix.nom : defVoix.nom,
       description: typeof voix.description === "string" ? voix.description : defVoix.description,
@@ -174,6 +178,17 @@ function normaliserCoach(a) {
 const entreeConfValide = (x) => x && typeof x === "object" && typeof x.conf === "string" && typeof x.coach === "string"
   && Number.isInteger(x.depuis) && x.depuis >= 0;
 
+// Conférence importée ou stockée : id (texte), participants (textes), messages (objets avec texte et rôle user/coach).
+// Les messages invalides sont retirés ; une conférence sans id ou sans liste de participants est écartée.
+function conferenceValide(c) {
+  if (!c || typeof c !== "object" || typeof c.id !== "string" || !c.id || !Array.isArray(c.participants) || !Array.isArray(c.messages)) return null;
+  return {
+    ...c,
+    participants: c.participants.filter((p) => typeof p === "string"),
+    messages: c.messages.filter((m) => m && typeof m === "object" && typeof m.texte === "string" && (m.role === "user" || m.role === "coach")),
+  };
+}
+
 // Complète un état (ancien format ou partiel) : champs manquants, coachs de départ absents. Ne retire rien.
 export function normaliser(etat) {
   const e = copie(etat || {});
@@ -188,7 +203,7 @@ export function normaliser(etat) {
     commun: typeof e.commun === "string" ? e.commun : COMMUN_DEPART,
     reglages: { cle: "", prenom: "Nico", clePayante: false, dernierExport: null, voixActive: true, ...(e.reglages && typeof e.reglages === "object" ? e.reglages : {}) },
     conversations: e.conversations && typeof e.conversations === "object" && !Array.isArray(e.conversations) ? e.conversations : {},
-    conferences: Array.isArray(e.conferences) ? e.conferences : [],
+    conferences: Array.isArray(e.conferences) ? e.conferences.map(conferenceValide).filter(Boolean) : [],
     aResumer: Array.isArray(e.aResumer) ? e.aResumer : [],
     aResumerConf: Array.isArray(e.aResumerConf) ? e.aResumerConf.filter(entreeConfValide) : [],
   };
@@ -213,7 +228,7 @@ export function ajouterCoach(etat, { nom, lien }) {
   if (Array.isArray(e.supprimes)) e.supprimes = e.supprimes.filter((s) => s !== id);
   const couleur = PALETTE[e.avatars.length % PALETTE.length];
   e.avatars.push({
-    id, nom: nomPropre, lien: lienPropre, couleur,
+    id, nom: nomPropre, lien: lienPropre, couleur, neuf: true,
     fiche: `Nom : ${nomPropre}\nLien : ${lienPropre}\nCouleur : ${couleur}\n\n## Qui est ce coach\n- ${nomPropre}, un coach fictif créé par Nico.\n\n## Caractère et façon de parler\n- Tutoie Nico, phrases courtes comme à l'oral.\n\n## Sa façon d'accompagner\n- Petits pas concrets, une question à la fois.\n\n## Limites et sécurité\n${assouplie(4)}\n${SECURITE.replace(/elle\/il/g, "il")}`,
     photo: null,
     voix: copie(VOIX_PAR_DEFAUT),
@@ -356,6 +371,13 @@ export function conversationsPerdues(avant, apres) {
   const av = avant && typeof avant === "object" ? avant : {};
   const ap = apres && typeof apres === "object" ? apres : {};
   return Object.entries(av).some(([id, v]) => Array.isArray(v) && v.length && JSON.stringify(v) !== JSON.stringify(ap[id] || []));
+}
+
+// Vrai si passer de `avant` à `apres` remplace ou retire au moins une conférence non vide du téléphone.
+export function conferencesPerdues(avant, apres) {
+  const liste = (x) => (Array.isArray(x) ? x : []);
+  return liste(avant).some((c) => c && Array.isArray(c.messages) && c.messages.length
+    && JSON.stringify(c) !== JSON.stringify(liste(apres).find((d) => d && d.id === c.id)));
 }
 
 // ---------- Conférences à résumer ----------

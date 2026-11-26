@@ -2,7 +2,7 @@
 // Les coachs parlent à voix haute (haut-parleur coupable) ; les voix s'enchaînent dans l'ordre des orateurs. Les conférences sont gardées dans etat.conferences et se rouvrent depuis « Mon équipe ».
 import { construirePrompt, repondre, choisirOrateurs, detecterDetresse, resumerMemoire } from "./cerveau.js";
 import { ajouterSouvenirs, messagesNicoConf, noterResumesConf, terminerResumeConf, entreesConfConservees } from "./donnees.js";
-import { ERREURS, ETATS, MEMOIRE_PLEINE, DELAI_RESUME, MAX_MESSAGES, prenomDe, creerDictee, creerVoixEcran } from "./commun-ecrans.js";
+import { ERREURS, ETATS, MEMOIRE_PLEINE, DELAI_RESUME, MAX_MESSAGES, prenomDe, resumesEnPause, pauserResumes, creerDictee, creerVoixEcran } from "./commun-ecrans.js";
 
 const RELANCE = "Continue la conversation.";
 const SILENCE = "(Le participant ne dit rien : laisse les coachs réagir entre eux.)";
@@ -208,7 +208,7 @@ export function initConference(ctx) {
     const cours = enCours;
     if (texte) $("conf-message").value = "";
     dessiner();
-    let resultats;
+    let resultats, plantage = false;
     try {
       resultats = await tourDeConference({
         etat: ctx.etat,
@@ -223,13 +223,14 @@ export function initConference(ctx) {
           redessiner();
         },
       });
-    } catch { resultats = []; }
+    } catch { resultats = []; plantage = true; }
     enCours = null;
     if (mon !== epoque) { redessiner(); return; } // données effacées ou remplacées pendant l'attente : réponses abandonnées
     // Seules les réponses réussies de coachs encore présents sont gardées ; les erreurs restent sur les cartes.
     const bons = resultats.filter((r) => !r.erreur && ctx.coachDe(r.coach));
     let plein = false;
-    if (!resultats.length) ctx.alerte("Aucun coach de cette conférence n'est encore dans ton équipe.");
+    if (plantage) ctx.alerte("Une erreur est survenue, réessaie.");
+    else if (!resultats.length) ctx.alerte("Aucun coach de cette conférence n'est encore dans ton équipe.");
     if (bons.length) {
       let stock = ctx.etat.conferences.find((x) => x && x.id === id);
       if (!stock) { stock = c; ctx.etat.conferences.push(stock); if (brouillon && brouillon.id === id) brouillon = null; }
@@ -237,6 +238,7 @@ export function initConference(ctx) {
       for (const r of bons) stock.messages.push({ role: "coach", coach: r.coach, texte: r.texte, emotion: r.emotion });
       plein = !(await ctx.sauver(true));
       if (mon !== epoque) { redessiner(); return; }
+      if (!montre()) planifier(id); // Nico a quitté l'écran pendant l'attente : ces messages sont résumés aussi
     } else if (texte && confId === id && !$("conf-message").value) {
       $("conf-message").value = texte; // aucune réponse : le message de Nico n'est pas gardé, on le lui rend
     }
@@ -266,13 +268,14 @@ export function initConference(ctx) {
     const messages = c && coach ? messagesNicoConf(c, entree.depuis) : [];
     if (!messages.length) { retirer(); await ctx.sauver(true); return null; } // conférence ou coach supprimé, rien à résumer
     const vu = c.messages.length; // messages vus par ce résumé
+    if (resumesEnPause()) return null; // un résumé a raté il y a peu : l'entrée reste, on réessaiera plus tard
     enResume.add(cle);
     let faits, minuteur;
     try {
       const delai = new Promise((r) => { minuteur = setTimeout(() => r(null), DELAI_RESUME); });
       faits = await Promise.race([resumerMemoire({ cle: ctx.etat.reglages.cle, coach, prenom: ctx.etat.reglages.prenom, messages }), delai]);
     } catch { faits = null; } finally { clearTimeout(minuteur); enResume.delete(cle); }
-    if (!faits) return null; // erreur, quota, hors ligne : l'entrée reste, retentée au lancement suivant
+    if (!faits) { pauserResumes(); return null; } // erreur, quota, hors ligne : l'entrée reste, retentée au lancement suivant
     // Tout a pu changer pendant l'attente : on relit le coach et l'entrée.
     const cible = ctx.coachDe(entree.coach);
     const courante = (ctx.etat.aResumerConf || []).find((x) => x.conf === entree.conf && x.coach === entree.coach && x.depuis === entree.depuis);
@@ -301,15 +304,28 @@ export function initConference(ctx) {
 
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && ctx.etat) resumerTout(); });
 
-  $("conf-terminer").onclick = async () => {
-    dictee.couper(); voix.arreter();
-    const c = conf();
-    ctx.retour();
-    if (!c || !ctx.etat.conferences.includes(c)) return; // brouillon sans réponse : rien à garder
+  // Range les résumés d'une conférence gardée (un par participant, sans doublon) et lance leur traitement.
+  // Appelé quand on quitte l'écran, par « Terminer » comme par le retour d'Android ou la flèche ‹ : plusieurs appels sont sans effet.
+  async function planifier(id) {
+    const c = ctx.etat.conferences.find((x) => x && x.id === id);
+    if (!c) return; // brouillon sans réponse : rien à garder
     ctx.etat.aResumerConf = noterResumesConf(ctx.etat.aResumerConf, c);
     c.resume = c.messages.length;
     await ctx.sauver(true);
     resumerTout(); // en arrière-plan : l'interface n'attend pas Gemini
+  }
+
+  let surConf = false;
+  ctx.surEcran((nom) => {
+    if (nom === "conference") { surConf = true; return; }
+    if (surConf) { surConf = false; if (confId) planifier(confId); }
+  });
+
+  $("conf-terminer").onclick = () => {
+    dictee.couper(); voix.arreter();
+    const id = confId;
+    ctx.retour();
+    if (id) planifier(id);
   };
 
   // ---------- Ouverture ----------
